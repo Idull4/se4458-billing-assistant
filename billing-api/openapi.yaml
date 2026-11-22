@@ -1,0 +1,317 @@
+openapi: 3.0.3
+info:
+  title: Mobile Provider Billing API
+  version: 1.0.0
+  description: |
+    SE 4458 Midterm 1 (Group 2) - Billing REST API used by the mobile provider app and the AI Billing Support Assistant.
+    All client traffic goes through the API Gateway. Versioned under `/api/v1`.
+
+    **Billing rules** (Mobile_Provider_Billing_Guide.md): phone - first 1,000 minutes free, then $10 per started 1,000-minute block;
+    internet - $50 up to 20 GB, then $10 per started 10 GB block; 1 GB = 1,000 MB. Currency: USD.
+
+    **Demo users** (password `Passw0rd!`): `admin` (admin), `5551001`, `5551002` (subscribers).
+servers:
+  - url: http://localhost:8000
+    description: Local API Gateway (Kong)
+  - url: http://localhost:3000
+    description: Billing API direct (development only)
+tags:
+  - name: Auth
+  - name: Mobile Provider App
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Obtain a JWT access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subscriberNo, password]
+              properties:
+                subscriberNo: { type: string, example: "5551001" }
+                password: { type: string, example: "Passw0rd!" }
+      responses:
+        "200":
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  tokenType: { type: string, example: Bearer }
+                  expiresIn: { type: integer, example: 3600 }
+                  subscriberNo: { type: string }
+                  role: { type: string, enum: [subscriber, admin] }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/usage:
+    post:
+      tags: [Mobile Provider App]
+      summary: Add Usage (admin)
+      description: Each call records one usage event - PHONE adds 10 minutes, INTERNET adds 1 MB.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subscriberNo, month, year, usageType]
+              properties:
+                subscriberNo: { type: string, example: "5551001" }
+                month: { type: integer, minimum: 1, maximum: 12, example: 11 }
+                year: { type: integer, example: 2026 }
+                usageType: { type: string, enum: [PHONE, INTERNET] }
+      responses:
+        "201":
+          description: Usage recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: SUCCESS }
+                  subscriberNo: { type: string }
+                  month: { type: integer }
+                  year: { type: integer }
+                  usageType: { type: string }
+                  added: { type: object, example: { minutes: 10 } }
+                  periodTotals:
+                    type: object
+                    properties:
+                      phoneMinutes: { type: integer }
+                      internetMb: { type: integer }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/bills/calculate:
+    post:
+      tags: [Mobile Provider App]
+      summary: Calculate Bill (admin)
+      description: |
+        Calculates the bill from recorded usage and stores it. Re-running it recalculates the same bill
+        (upsert per subscriber/month/year) and preserves payments already made.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PeriodRequest" }
+      responses:
+        "200":
+          description: Bill calculated and stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: SUCCESS }
+                  recalculated: { type: boolean }
+                  bill:
+                    allOf:
+                      - $ref: "#/components/schemas/Bill"
+                      - type: object
+                        properties:
+                          breakdown: { $ref: "#/components/schemas/Breakdown" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/bills:
+    get:
+      tags: [Mobile Provider App]
+      summary: Query Bill (public)
+      description: Returns the stored bill. No authentication per the assignment specification; rate-limited at the gateway.
+      parameters:
+        - { name: subscriberNo, in: query, required: true, schema: { type: string }, example: "5551001" }
+        - { name: month, in: query, required: true, schema: { type: integer, minimum: 1, maximum: 12 }, example: 10 }
+        - { name: year, in: query, required: true, schema: { type: integer }, example: 2026 }
+      responses:
+        "200":
+          description: Stored bill
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bill" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { description: Rate limit exceeded (gateway) }
+
+  /api/v1/bills/detailed:
+    get:
+      tags: [Mobile Provider App]
+      summary: Query Bill Detailed (authenticated, paged)
+      description: |
+        Bill totals, usage and charge breakdown, plus a paged list of the recorded usage events.
+        Subscribers can only read their own account (subscriber number taken from the token);
+        admins must pass `subscriberNo`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: subscriberNo, in: query, required: false, schema: { type: string }, description: "Admin only; subscribers may omit it" }
+        - { name: month, in: query, required: true, schema: { type: integer, minimum: 1, maximum: 12 }, example: 10 }
+        - { name: year, in: query, required: true, schema: { type: integer }, example: 2026 }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200":
+          description: Detailed bill
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Bill"
+                  - type: object
+                    properties:
+                      usage:
+                        type: object
+                        properties:
+                          phoneMinutes: { type: integer }
+                          internetMb: { type: integer }
+                          internetGb: { type: number }
+                      breakdown: { $ref: "#/components/schemas/Breakdown" }
+                      usageEvents:
+                        type: object
+                        properties:
+                          page: { type: integer }
+                          pageSize: { type: integer }
+                          totalItems: { type: integer }
+                          totalPages: { type: integer }
+                          items:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: integer }
+                                usageType: { type: string, enum: [PHONE, INTERNET] }
+                                quantity: { type: integer }
+                                createdAt: { type: string, format: date-time }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/bills/pay:
+    post:
+      tags: [Mobile Provider App]
+      summary: Pay Bill (authenticated)
+      description: |
+        Records a simulated partial or full payment (no card processing). Rejects duplicate transaction IDs (409),
+        amounts above the remaining balance (422) and payments on fully paid bills (422).
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [month, year, amount, transactionId]
+              example: { month: 10, year: 2026, amount: 30, transactionId: "TXN-DEMO-0001" }
+              properties:
+                subscriberNo: { type: string, description: "Admin only. Subscribers must omit it (taken from the token); a different number returns 403." }
+                month: { type: integer, example: 10 }
+                year: { type: integer, example: 2026 }
+                amount: { type: number, example: 20 }
+                transactionId: { type: string, example: "TXN-20261120-0001" }
+      responses:
+        "200":
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    properties:
+                      paymentStatus: { type: string, example: SUCCESS }
+                      transactionId: { type: string }
+                      paymentAmount: { type: number, description: Amount of this payment }
+                  - $ref: "#/components/schemas/Bill"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Duplicate transaction ID
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Amount exceeds balance or bill already paid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    PeriodRequest:
+      type: object
+      required: [subscriberNo, month, year]
+      properties:
+        subscriberNo: { type: string, example: "5551001" }
+        month: { type: integer, minimum: 1, maximum: 12, example: 10 }
+        year: { type: integer, example: 2026 }
+    Bill:
+      type: object
+      properties:
+        subscriberNo: { type: string }
+        month: { type: integer }
+        year: { type: integer }
+        currency: { type: string, example: USD }
+        total: { type: number, example: 80 }
+        paidAmount: { type: number, example: 0, description: Total paid so far }
+        remainingBalance: { type: number, example: 80 }
+        status: { type: string, enum: [UNPAID, PARTIALLY_PAID, PAID] }
+        dueDate: { type: string, format: date, example: "2026-11-15" }
+        calculatedAt: { type: string, format: date-time }
+    Breakdown:
+      type: object
+      properties:
+        phone:
+          type: object
+          properties:
+            minutes: { type: integer }
+            includedMinutes: { type: integer }
+            charge: { type: number }
+            rule: { type: string }
+        internet:
+          type: object
+          properties:
+            megabytes: { type: integer }
+            gigabytes: { type: number }
+            includedGb: { type: integer }
+            charge: { type: number }
+            rule: { type: string }
+        total: { type: number }
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string, example: VALIDATION_ERROR, description: "Machine-readable error code (see README error table)" }
+            message: { type: string }
+            details: { type: object }
+  responses:
+    ValidationError:
+      description: Invalid input
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unauthorized:
+      description: Missing/invalid token or credentials
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Forbidden:
+      description: Authenticated but not allowed
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: Subscriber or bill not found
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
