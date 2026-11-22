@@ -1,0 +1,129 @@
+# Test run 2026-11-22T21:57Z - node v22.23.5
+> test
+> npm --prefix billing-api test && npm --prefix mcp-server test && npm --prefix agent test
+> billing-api@1.0.0 test
+> node --test test/*.test.ts
+# Subtest: POST /api/v1/auth/login
+    ok 1 - returns a JWT for valid credentials
+    ok 2 - rejects a wrong password with 401
+ok 1 - POST /api/v1/auth/login
+# Subtest: POST /api/v1/usage (Add Usage)
+    ok 1 - PHONE adds 10 minutes and INTERNET adds 1 MB
+    ok 2 - rejects an invalid usage type with 400
+    ok 3 - requires authentication (401) and admin role (403)
+    ok 4 - returns 404 for an unknown subscriber
+ok 2 - POST /api/v1/usage (Add Usage)
+# Subtest: POST /api/v1/bills/calculate (Calculate Bill)
+    ok 1 - calculates and stores the bill from recorded usage
+    ok 2 - recalculation keeps payments already made
+    ok 3 - rejects an invalid month with 400
+    ok 4 - subscribers cannot calculate bills (403)
+ok 3 - POST /api/v1/bills/calculate (Calculate Bill)
+# Subtest: GET /api/v1/bills (Query Bill)
+    ok 1 - returns the stored bill without authentication
+    ok 2 - returns 404 BILL_NOT_FOUND when the bill has not been calculated (Guide §4.4)
+    ok 3 - rejects missing parameters with 400
+ok 4 - GET /api/v1/bills (Query Bill)
+# Subtest: GET /api/v1/bills/detailed (Query Bill Detailed)
+    ok 1 - returns breakdown and paged usage events for the token's subscriber
+    ok 2 - a subscriber cannot read another subscriber's bill (403)
+    ok 3 - requires authentication (401) and rejects expired or forged tokens
+    ok 4 - rejects pageSize above 100 with 400
+    ok 5 - admin can read any subscriber's detailed bill
+ok 5 - GET /api/v1/bills/detailed (Query Bill Detailed)
+# Subtest: POST /api/v1/bills/pay (Pay Bill)
+    ok 1 - partial payment reduces the balance but keeps the bill unpaid (Guide §5.1)
+    ok 2 - paying the remaining balance marks the bill PAID; further payments are rejected
+    ok 3 - rejects a duplicate transaction ID with 409 and records no second payment
+    ok 4 - concurrent duplicate requests record only one payment
+    ok 5 - rejects an amount above the remaining balance with 422
+    ok 6 - rejects zero, negative and non-numeric amounts with 400
+    ok 7 - cannot pay another subscriber's bill (403) or without a token (401)
+    ok 8 - returns 404 when paying a bill that was not calculated
+ok 6 - POST /api/v1/bills/pay (Pay Bill)
+# Subtest: Cross-cutting
+    ok 1 - unknown routes return a JSON 404 error
+    ok 2 - Swagger/OpenAPI document is served
+ok 7 - Cross-cutting
+# Subtest: addUsage records 10 minutes per PHONE event and 1 MB per INTERNET event
+ok 8 - addUsage records 10 minutes per PHONE event and 1 MB per INTERNET event
+# Subtest: calculate with no usage produces the $50 internet base bill
+ok 9 - calculate with no usage produces the $50 internet base bill
+# Subtest: admin accounts are not billable subscribers (404)
+ok 10 - admin accounts are not billable subscribers (404)
+# Subtest: pay rejects duplicates before touching the balance
+ok 11 - pay rejects duplicates before touching the balance
+# Subtest: phone: first 1,000 minutes are free (Guide §2.1)
+ok 12 - phone: first 1,000 minutes are free (Guide §2.1)
+# Subtest: phone: each started extra 1,000-minute block costs $10 (Guide §2.2 examples)
+ok 13 - phone: each started extra 1,000-minute block costs $10 (Guide §2.2 examples)
+# Subtest: internet: $50 base even with zero usage, up to 20 GB (Guide §3.1)
+ok 14 - internet: $50 base even with zero usage, up to 20 GB (Guide §3.1)
+# Subtest: internet: each started extra 10 GB block costs $10 (Guide §3.2 examples)
+ok 15 - internet: each started extra 10 GB block costs $10 (Guide §3.2 examples)
+# Subtest: worked example: 1,350 minutes + 35 GB = $80 (Guide §4.3)
+ok 16 - worked example: 1,350 minutes + 35 GB = $80 (Guide §4.3)
+# Subtest: due date is 15 days after the end of the billing month (Guide §6.1)
+ok 17 - due date is 15 days after the end of the billing month (Guide §6.1)
+# Subtest: status: partial payment does not mark bill paid (Guide §5.1)
+ok 18 - status: partial payment does not mark bill paid (Guide §5.1)
+# tests 39
+# suites 7
+# pass 39
+# fail 0
+> mcp-server@1.0.0 test
+> node --test test/*.test.ts
+# Subtest: chunking and indexing
+    ok 1 - splits the guide into subsections with section ids and headings
+    ok 2 - rejects a document without numbered sections
+    ok 3 - user input cannot inject FTS5 syntax
+    ok 4 - index is built once and reused while the document is unchanged; rebuilt when it changes
+ok 1 - chunking and indexing
+# Subtest: retrieval over Mobile_Provider_Billing_Guide.md
+    ok 1 - query 1 - extra internet cost returns §3.2 / §8.1
+    ok 2 - query 2 - bill due date returns §6.1 first
+    ok 3 - query 3 - disputing a charge returns dispute sections (§7 / §8.4)
+    ok 4 - results include document, section, heading and text (Guide §9 format)
+    ok 5 - unrelated or empty queries return no matches
+ok 2 - retrieval over Mobile_Provider_Billing_Guide.md
+# Subtest: MCP protocol over stdio
+    ok 1 - lists the search_billing_documentation tool with its input schema
+    ok 2 - tool call returns cited passages
+    ok 3 - invalid input (empty query) is rejected
+ok 3 - MCP protocol over stdio
+# Subtest: MCP protocol over Streamable HTTP
+    ok 1 - tool call over HTTP returns cited passages
+ok 4 - MCP protocol over Streamable HTTP
+# tests 13
+# suites 4
+# pass 13
+# fail 0
+> agent@1.0.0 test
+> node --test test/*.test.ts
+# Subtest: agent loop (scripted LLM)
+    ok 1 - MCP-only: LLM picks the documentation tool, agent executes it and returns the result to the LLM
+    ok 2 - combined: REST (via gateway, with JWT) + MCP results both reach the LLM
+    ok 3 - payment: an explicit yes executes pay_bill with a generated transaction ID
+    ok 4 - payment: without explicit confirmation the Pay Bill API is never called
+    ok 5 - identity: a subscriber number supplied by the LLM is ignored - REST calls use the session
+    ok 6 - assistant messages are sent back unchanged (keeps Gemini thought signatures)
+    ok 7 - invalid tool arguments are rejected by the agent, not sent to the API
+ok 1 - agent loop (scripted LLM)
+# Subtest: tools and security
+    ok 1 - offers exactly the MCP search and three subscriber REST tools - no admin operations
+    ok 2 - no tool schema has a subscriber number parameter
+    ok 3 - pay_bill retries a network failure once with the SAME transaction ID
+    ok 4 - API errors are returned to the LLM as structured data
+    ok 5 - instructions bind the agent to the logged-in subscriber and require citations
+ok 2 - tools and security
+# Subtest: LLM client
+    ok 1 - Gemini is the default provider when GEMINI_API_KEY is set
+    ok 2 - a missing key gives a clear error
+    ok 3 - sends model, messages and tools to <base>/chat/completions with the bearer key
+    ok 4 - retries on 429 (free-tier rate limit) and then succeeds
+    ok 5 - trace formatting lists tool name, input, result and final answer
+ok 3 - LLM client
+# tests 17
+# suites 3
+# pass 17
+# fail 0
