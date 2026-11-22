@@ -1,0 +1,30 @@
+{
+  "name": "mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server: indexed Mobile Provider Billing Guide",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start": "node src/server.ts --transport=stdio",
+    "start:http": "node src/server.ts --transport=http",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "express": "^5.3.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "typescript": "~5.9.3"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}
