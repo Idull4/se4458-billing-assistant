@@ -1,0 +1,15 @@
+{
+  "name": "se4458-billing-assistant",
+  "private": true,
+  "description": "SE 4458 Midterm 1 - Group 2: AI Billing Support Assistant (AI Agent + MCP Server + Billing REST API + API Gateway)",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "install:all": "npm --prefix billing-api install && npm --prefix mcp-server install && npm --prefix agent install",
+    "test": "npm --prefix billing-api test && npm --prefix mcp-server test && npm --prefix agent test",
+    "typecheck": "npm --prefix billing-api run typecheck && npm --prefix mcp-server run typecheck && npm --prefix agent run typecheck",
+    "agent": "npm --prefix agent start",
+    "check-llm": "npm --prefix agent run check-llm"
+  }
+}
