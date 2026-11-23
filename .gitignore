@@ -6,3 +6,6 @@ docs/logs/*.log
 !docs/logs/demo-*.log
 # Local planning notes (outdated, not part of the deliverable)
 CLAUDE.md
+# Generated Azure files with secrets
+gateway/kong.cloud.yml
+scripts/azure-env.cmd
