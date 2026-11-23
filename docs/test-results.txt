@@ -1,4 +1,4 @@
-# Test run 2026-11-22T21:57Z - node v22.23.5
+# Test run 2026-11-23T11:16Z - node v22.23.5
 > test
 > npm --prefix billing-api test && npm --prefix mcp-server test && npm --prefix agent test
 > billing-api@1.0.0 test
@@ -121,9 +121,10 @@ ok 2 - tools and security
     ok 2 - a missing key gives a clear error
     ok 3 - sends model, messages and tools to <base>/chat/completions with the bearer key
     ok 4 - retries on 429 (free-tier rate limit) and then succeeds
-    ok 5 - trace formatting lists tool name, input, result and final answer
+    ok 5 - a daily quota error fails fast with a hint (no pointless retries)
+    ok 6 - trace formatting lists tool name, input, result and final answer
 ok 3 - LLM client
-# tests 17
+# tests 18
 # suites 3
-# pass 17
+# pass 18
 # fail 0

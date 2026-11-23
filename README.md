@@ -4,7 +4,7 @@ A conversational assistant for mobile subscribers. It answers questions about bi
 
 | Component | Technology | Folder |
 |---|---|---|
-| **AI Agent** (CLI) | Own agent loop on the OpenAI-compatible Chat Completions API with real tool/function calling — **Google Gemini** (free tier) by default, OpenAI optional; MCP client via the official MCP SDK | `agent/` |
+| **AI Agent** (CLI) | Own agent loop on the OpenAI-compatible Chat Completions API with real tool/function calling — **Google Gemini `gemini-3.5-flash-lite`** (free tier) by default, OpenAI optional; MCP client via the official MCP SDK | `agent/` |
 | **MCP Server** | Official MCP TypeScript SDK; SQLite FTS5 + BM25 index of the billing guide; stdio and Streamable HTTP | `mcp-server/` |
 | **Billing REST API** | Node.js 22 + TypeScript, Express 5, JWT, OpenAPI/Swagger, **PostgreSQL 16** | `billing-api/`, `db/` |
 | **API Gateway** | Kong 3.9 (DB-less, declarative), with JWT, rate limiting and versioned routes | `gateway/` |
@@ -238,7 +238,7 @@ Three retrieval tests (in `mcp-server/test/mcp.test.ts`):
    - `query_bill`, `query_bill_detailed` and `pay_bill` go to the REST API **through the gateway**.
 3. Each result is sent back to the LLM as a `tool` message. The loop repeats until the LLM gives a final answer, grounded in those results and citing guide sections.
 
-**LLM provider:** Google **Gemini** (free tier) is the default, via its OpenAI-compatible endpoint. OpenAI works too: set `OPENAI_API_KEY` instead. The model is set with `LLM_MODEL`. `npm run check-llm` verifies the key, lists available models and tests a tool call. Assistant messages are sent back unchanged, so Gemini's thought signatures are preserved. 429/503 responses (free-tier rate limits) are retried with backoff.
+**LLM provider:** Google **Gemini** (free tier) is the default, via its OpenAI-compatible endpoint, with model `gemini-3.5-flash-lite`. OpenAI works too: set `OPENAI_API_KEY` instead. The model is set with `LLM_MODEL`. `npm run check-llm` verifies the key, lists available models and tests a tool call. Assistant messages are sent back unchanged, so Gemini's thought signatures are preserved. 429/503 responses (free-tier rate limits) are retried with backoff.
 
 **Security, enforced in code:**
 
@@ -274,7 +274,7 @@ All tests run with `npm test` from the repo root (or `npm test` inside each fold
 |---|---|---|
 | `billing-api` | 39 | Service-layer tests without HTTP, pricing edge cases (1,000/1,001 min, 20,000/20,001 MB, the §4.3 $80 example), due dates, and every endpoint with success **and** failure cases: validation, 401/403, 404, duplicate transaction (sequential and concurrent), overpayment, partial/full payment, recalculation keeping payments |
 | `mcp-server` | 13 | Chunking, FTS-injection safety, index reuse/rebuild, 3 retrieval queries, real MCP calls over stdio and Streamable HTTP |
-| `agent` | 17 | Full agent loop with a scripted fake LLM: MCP-only, combined REST+MCP, payment approved/rejected, LLM-supplied subscriber number ignored, Gemini message preservation, argument validation, no admin tools, transaction-ID retry, LLM client (provider selection, request format, 429 retry) |
+| `agent` | 18 | Full agent loop with a scripted fake LLM: MCP-only, combined REST+MCP, payment approved/rejected, LLM-supplied subscriber number ignored, Gemini message preservation, argument validation, no admin tools, transaction-ID retry, LLM client (provider selection, request format, 429 retry, daily-quota fail-fast) |
 
 Evidence: `docs/test-results.txt`.
 
@@ -284,7 +284,9 @@ _Target: Azure._ Container Apps run `billing-api` and `mcp-server`. Azure Databa
 
 ## LLM cost
 
-The default is **Google Gemini on the free tier**: no cost and no credit card. Free-tier requests are rate-limited per minute, and the agent retries automatically on 429. A demo turn uses roughly 2-6k tokens.
+The default is **Google Gemini `gemini-3.5-flash-lite` on the free tier**: no cost and no credit card. A demo session (the six scenarios) uses about 15-20 LLM requests and 2-6k tokens per turn.
+
+Free-tier quotas differ per model. `gemini-3.6-flash`, for example, allows only 20 requests per day, which is why the default is a Flash-Lite model. Per-minute limits (429) are retried automatically with backoff. A used-up daily quota fails fast with a hint to set another model via `LLM_MODEL`. Quotas reset at midnight US Pacific time.
 
 With OpenAI (`OPENAI_API_KEY`, e.g. `gpt-4o-mini`), the whole demo costs well under $1.
 
@@ -308,4 +310,5 @@ Each entry gives the assumption, the reason and the spec reference.
 12. **No Dispute API** (Guide §7.2). The assistant explains the process from the guide and does not promise refunds.
 13. **Months without a year** in a question mean the most recent such month not after today.
 14. **The MCP path is separate from the gateway**, per the required architecture. The MCP server exposes only public policy text.
-15. **Secrets:** `.env` is not committed. The development JWT secret in `kong.yml` and `docker-compose.yml` is for local use only.
+15. **Data vs policy:** the Query Bill Detailed breakdown returns usage and stored charges only, not pricing rule texts. Rules are explained from the billing guide via MCP (Guide §9), so the same policy is not maintained in two places.
+16. **Secrets:** `.env` is not committed. The development JWT secret in `kong.yml` and `docker-compose.yml` is for local use only.
