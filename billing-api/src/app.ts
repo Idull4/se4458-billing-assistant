@@ -13,6 +13,7 @@ import { AuthController } from "./controllers/auth-controller.ts";
 import { BillController } from "./controllers/bill-controller.ts";
 import { UsageController } from "./controllers/usage-controller.ts";
 import { errorHandler, notFound } from "./middleware/error-handler.ts";
+import { gatewayGuard } from "./middleware/gateway-guard.ts";
 import { requestLogger } from "./middleware/request-logger.ts";
 import type { Repository } from "./repositories/repository.ts";
 import { createV1Router } from "./routes/v1.ts";
@@ -26,6 +27,8 @@ export interface AppOptions {
   jwtSecret: string;
   tokenTtlSeconds?: number;
   logRequests?: boolean;
+  /** Cloud only: shared secret the gateway sends in X-Gateway-Key; requests without it are rejected. */
+  gatewaySecret?: string;
 }
 
 export function createApp(opts: AppOptions) {
@@ -38,7 +41,7 @@ export function createApp(opts: AppOptions) {
   app.use(express.json({ limit: "100kb" }));
 
   app.get("/health", (_req, res) => { res.json({ status: "ok" }); });
-  app.use("/api/v1", createV1Router({
+  app.use("/api/v1", gatewayGuard(opts.gatewaySecret), createV1Router({
     authService,
     authController: new AuthController(authService),
     usageController: new UsageController(billingService),

@@ -1,7 +1,9 @@
 // API tests: real HTTP layer (supertest) + business logic, in-memory repository (no DB, no cloud, no LLM).
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { ADMIN, PASSWORD, SUB1, SUB2, setup, token } from "./helpers.ts";
+import request from "supertest";
+import { createApp } from "../src/app.ts";
+import { ADMIN, PASSWORD, SECRET, SUB1, SUB2, setup, token } from "./helpers.ts";
 
 describe("POST /api/v1/auth/login", () => {
   test("returns a JWT for valid credentials", async () => {
@@ -254,6 +256,24 @@ describe("POST /api/v1/bills/pay (Pay Bill)", () => {
     const res = await http.post("/api/v1/bills/pay").set("Authorization", SUB1())
       .send({ month: 11, year: 2026, amount: 10, transactionId: "TXN-nobill-1" });
     assert.equal(res.status, 404);
+  });
+});
+
+describe("Gateway guard (cloud: only the gateway may call the API)", () => {
+  test("with a gateway secret configured, a direct call without X-Gateway-Key is rejected (403)", async () => {
+    const { repo } = await setup();
+    const http = request(createApp({ repo, jwtSecret: SECRET, gatewaySecret: "gw-secret" }));
+    const res = await http.get("/api/v1/bills").query({ subscriberNo: "5551001", month: 10, year: 2026 });
+    assert.equal(res.status, 403);
+    assert.equal(res.body.error.code, "GATEWAY_REQUIRED");
+  });
+
+  test("a request carrying the gateway key passes through", async () => {
+    const { repo } = await setup();
+    const http = request(createApp({ repo, jwtSecret: SECRET, gatewaySecret: "gw-secret" }));
+    const res = await http.get("/api/v1/bills").set("X-Gateway-Key", "gw-secret").query({ subscriberNo: "5551001", month: 10, year: 2026 });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.total, 80);
   });
 });
 

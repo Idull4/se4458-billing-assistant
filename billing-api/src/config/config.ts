@@ -11,6 +11,7 @@ export interface Config {
   tokenTtlSeconds: number;
   seedOnStart: boolean;
   schemaPath: string;
+  gatewaySecret?: string;
 }
 
 /** db/schema.sql is at the repo root locally and next to the app inside the container image. */
@@ -30,5 +31,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     tokenTtlSeconds: Number(env.TOKEN_TTL_SECONDS ?? 3600),
     seedOnStart: env.SEED_ON_START === "true",
     schemaPath: findSchemaPath(),
+    gatewaySecret: env.GATEWAY_SHARED_SECRET || undefined,
   };
 }

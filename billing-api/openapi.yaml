@@ -11,6 +11,10 @@ info:
 
     **Demo users** (password `Passw0rd!`): `admin` (admin), `5551001`, `5551002` (subscribers).
 servers:
+  - url: /
+    description: This gateway (the host serving this page - Azure or local)
+  - url: https://gateway.grayforest-a8b5e275.polandcentral.azurecontainerapps.io
+    description: Azure API Gateway (Kong on Azure Container Apps)
   - url: http://localhost:8000
     description: Local API Gateway (Kong)
   - url: http://localhost:3000

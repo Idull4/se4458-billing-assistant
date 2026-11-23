@@ -21,7 +21,7 @@ async function main() {
   }
   if (config.seedOnStart) await seed(repo, { onlyIfEmpty: true });
 
-  createApp({ repo, jwtSecret: config.jwtSecret, tokenTtlSeconds: config.tokenTtlSeconds, logRequests: true })
+  createApp({ repo, jwtSecret: config.jwtSecret, tokenTtlSeconds: config.tokenTtlSeconds, logRequests: true, gatewaySecret: config.gatewaySecret })
     .listen(config.port, () => console.log(`Billing API listening on :${config.port} (Swagger UI: /api/v1/docs)`));
 }
 
