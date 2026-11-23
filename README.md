@@ -273,6 +273,16 @@ Three retrieval tests (in `mcp-server/test/mcp.test.ts`):
 - **Combined REST + MCP turn against Azure:** [`docs/logs/demo-azure-combined.log`](docs/logs/demo-azure-combined.log)
 - **Unit test run:** [`docs/test-results.txt`](docs/test-results.txt)
 
+### Screenshots
+
+| | |
+|---|---|
+| **Azure resources** (resource group `se4458-billing-rg`, Poland Central) | ![Azure resources](docs/screenshots/01-azure-portal.png) |
+| **Protected gateway route without a token → 401 from Kong** (Azure Swagger) | ![Gateway 401](docs/screenshots/02-gateway-401.png) |
+| **Direct call to the Billing API, bypassing the gateway → 403 `GATEWAY_REQUIRED`** | ![Gateway bypass 403](docs/screenshots/03-gateway-bypass-403.png) |
+| **Unit tests: 41 + 13 + 18 passed**, incl. the three MCP retrieval tests | ![Unit tests](docs/screenshots/04-unit-tests.png) |
+| **Confirmed simulated payment**: the CLI asks, the user types `yes`, the bill becomes PAID (agent connected to Azure) | ![Confirmed payment](docs/screenshots/05-agent-payment.png) |
+
 ## Testing
 
 All tests run with `npm test` from the repo root (or `npm test` inside each folder). They use Node's built-in runner (`node:test`) and need **no cloud, no database and no LLM**: the API tests use an in-memory repository behind the real Express app (supertest), the MCP tests start the real server over stdio and HTTP, and the agent tests drive the real agent loop with a scripted fake LLM.
