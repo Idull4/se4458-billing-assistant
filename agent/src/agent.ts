@@ -11,7 +11,7 @@ Today is ${date}. The logged-in subscriber is ${session.subscriberNo}.
 Tool selection:
 - Policy, pricing, due dates, partial payments, late payments, disputes -> search_billing_documentation (MCP). Search with short English keywords.
 - The subscriber's live bill, balance, usage or payments -> query_bill, query_bill_detailed, pay_bill (REST via API Gateway).
-- "Why is my bill higher / what am I paying for" -> query_bill_detailed for the actual usage (also for the comparison month if one is mentioned) AND search_billing_documentation for the pricing rules.
+- "Why is my bill higher / what am I paying for / explain my charges" -> you MUST call BOTH, before answering: query_bill_detailed for the actual usage (also for the comparison month if one is mentioned) AND search_billing_documentation for the pricing rules. The billing API returns numbers only, never pricing rules: explain rules only from search_billing_documentation results, never from memory.
 
 Rules:
 - Ground every answer in tool results. Never invent usage, amounts or policies. Cite policy sections like (Guide §3.2).
@@ -29,6 +29,7 @@ export interface TraceEntry {
   input: unknown;
   output?: unknown;
   confirmation?: "approved" | "rejected";
+  confirmationPrompt?: string;
 }
 
 export interface TurnResult {
@@ -78,6 +79,7 @@ export async function runTurn(deps: AgentDeps, history: ChatMessage[], userMessa
         const summary = `Pay $${Number(a?.amount).toFixed(2)} for the ${String(a?.month).padStart(2, "0")}/${a?.year} bill of subscriber ${deps.session.subscriberNo}?`;
         const approved = await deps.confirm(summary, a);
         entry.confirmation = approved ? "approved" : "rejected";
+        entry.confirmationPrompt = summary;
         output = approved
           ? await deps.execute(name, args)
           : { ok: false, error: "USER_REJECTED", message: "The user did not confirm. No payment was made." };
@@ -101,7 +103,8 @@ export function formatTrace(trace: TraceEntry[], answer: string, maxLen = 600) {
   trace.forEach((t, i) => {
     lines.push(`[${i + 1}] tool: ${t.tool}`);
     lines.push(`    input: ${clip(t.input)}`);
-    if (t.confirmation) lines.push(`    confirmation: ${t.confirmation}`);
+    if (t.confirmationPrompt) lines.push(`    asked user: "${t.confirmationPrompt}"`);
+    if (t.confirmation) lines.push(`    confirmation: ${t.confirmation} by the user`);
     lines.push(`    result: ${t.output === undefined ? "(not executed)" : clip(t.output)}`);
   });
   lines.push(`final answer: ${answer}`);

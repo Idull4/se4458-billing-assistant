@@ -31,7 +31,8 @@ export interface Llm {
 }
 
 export const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
-export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
+// Flash-Lite: tool calling + a much larger free daily quota than gemini-3.6-flash (20 requests/day on the free tier).
+export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 export const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 
 /** Pick provider from environment: GEMINI_API_KEY (default) or OPENAI_API_KEY. */
@@ -49,7 +50,7 @@ export function resolveLlmConfig(env: NodeJS.ProcessEnv = process.env): LlmConfi
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-export function createLlm(config: LlmConfig, fetchImpl: FetchLike = fetch, retryDelaysMs = [5000, 15000, 30000]): Llm {
+export function createLlm(config: LlmConfig, fetchImpl: FetchLike = fetch, retryDelaysMs = [10000, 30000, 60000]): Llm {
   const url = config.baseUrl.replace(/\/?$/, "/") + "chat/completions";
   return {
     model: config.model,
@@ -68,7 +69,11 @@ export function createLlm(config: LlmConfig, fetchImpl: FetchLike = fetch, retry
           return { ...message, role: "assistant", content: message.content ?? null };
         }
         const text = await res.text();
-        // Free tiers are rate limited: wait and retry on 429 / 503.
+        // A daily quota does not recover by waiting: fail fast with a hint instead of retrying.
+        if (res.status === 429 && /per day|PerDay|requests_per_day/i.test(text)) {
+          throw new Error(`Daily free-tier quota of model "${config.model}" is used up. Set another model in .env, e.g. LLM_MODEL=gemini-3.1-flash-lite, or try again after the quota resets (midnight US Pacific time).`);
+        }
+        // Per-minute rate limits: wait and retry on 429 / 503.
         if ((res.status === 429 || res.status === 503) && attempt < retryDelaysMs.length) {
           const retryAfter = Number(res.headers.get("retry-after"));
           const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : retryDelaysMs[attempt];

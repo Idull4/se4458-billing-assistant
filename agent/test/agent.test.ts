@@ -74,6 +74,7 @@ describe("agent loop (scripted LLM)", () => {
     const turn = await runTurn(d, [], "Pay my October bill");
     assert.match(prompts[0], /Pay \$80\.00 for the 10\/2026 bill of subscriber 5551001/);
     assert.equal(turn.trace[0].confirmation, "approved");
+    assert.match(formatTrace(turn.trace, turn.answer), /asked user: "Pay \$80\.00 for the 10\/2026 bill of subscriber 5551001\?"/);
     assert.deepEqual(JSON.parse(String(d.gateway.calls[0].init.body)), { month: 10, year: 2026, amount: 80, transactionId: "TXN-fixed-1" });
   });
 
@@ -158,6 +159,7 @@ describe("tools and security", () => {
     assert.match(text, /logged-in subscriber is 5551001/);
     assert.match(text, /Today is 2026-11-23/);
     assert.match(text, /Guide §4\.4/);
+    assert.match(text, /you MUST call BOTH/);
   });
 });
 
@@ -193,6 +195,16 @@ describe("LLM client", () => {
       n++ === 0 ? new Response("quota", { status: 429 }) : new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), { status: 200 }), [1]);
     assert.equal((await llm.chat([{ role: "user", content: "x" }], [])).content, "ok");
     assert.equal(n, 2);
+  });
+
+  test("a daily quota error fails fast with a hint (no pointless retries)", async () => {
+    let n = 0;
+    const llm = createLlm({ provider: "gemini", apiKey: "k", baseUrl: "https://llm.test/", model: "m" }, async () => {
+      n++;
+      return new Response("Generate content requests per day limit exceeded on Free Tier", { status: 429 });
+    }, [1, 1, 1]);
+    await assert.rejects(llm.chat([{ role: "user", content: "x" }], []), /Daily free-tier quota.*LLM_MODEL/);
+    assert.equal(n, 1);
   });
 
   test("trace formatting lists tool name, input, result and final answer", () => {
