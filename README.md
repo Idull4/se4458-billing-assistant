@@ -96,6 +96,8 @@ All users have the password **`Passw0rd!`**.
 | `5551001` | subscriber | **Sep 2026:** 800 min, 18 GB → **$50**. **Oct 2026:** 1,350 min, 35 GB → **$80** (the Guide §4.3 example). **Nov 2026:** usage recorded, bill **not calculated** yet |
 | `5551002` | subscriber | **Oct 2026:** 2,010 min, 21.5 GB → **$80**, $30 already paid (`PARTIALLY_PAID`) |
 
+**Azure demo data:** the Azure database was seeded with the same data, then used in the demo video. There, the **Sep and Oct 2026 bills of `5551001` are already PAID**. To try a payment on Azure, log in as **`5551002`** (Oct 2026, $50 remaining). A local `docker compose` start always begins from the original seed.
+
 ## REST API
 
 Every route is versioned under `/api/v1`. The OpenAPI spec is in `billing-api/openapi.yaml`, and Swagger UI is served at `/api/v1/docs`.
