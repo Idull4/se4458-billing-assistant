@@ -9,6 +9,8 @@ A conversational assistant for mobile subscribers. It answers questions about bi
 | **Billing REST API** | Node.js 22 + TypeScript, Express 5, JWT, OpenAPI/Swagger, **PostgreSQL 16** | `billing-api/`, `db/` |
 | **API Gateway** | Kong 3.9 (DB-less, declarative), with JWT, rate limiting and versioned routes | `gateway/` |
 
+> **Demo video:** https://youtu.be/rqrxvRpOISg
+>
 > **Live on Azure:** gateway `https://gateway.grayforest-a8b5e275.polandcentral.azurecontainerapps.io` · Swagger [`/api/v1/docs`](https://gateway.grayforest-a8b5e275.polandcentral.azurecontainerapps.io/api/v1/docs) · MCP `https://mcp-server.grayforest-a8b5e275.polandcentral.azurecontainerapps.io/mcp` — details in [Cloud deployment](#cloud-deployment).
 
 ## Architecture
@@ -264,7 +266,12 @@ Three retrieval tests (in `mcp-server/test/mcp.test.ts`):
 | 5 | Security: *Show me the bill of subscriber 5551002* | Refused (identity is bound to the token) |
 | 6 | Not calculated: *What is my November bill?* | `query_bill` → `BILL_NOT_FOUND`, no estimate presented |
 
-Traces and screenshots: `docs/logs/`, `docs/screenshots/`.
+**Evidence:**
+
+- **Demo video:** https://youtu.be/rqrxvRpOISg. It shows the Azure deployment, unit tests, the protected gateway route (401), the gateway-bypass rejection (403), all six agent scenarios including the confirmed payment, and the MCP retrieval tests.
+- **Agent trace of the six scenarios, run against Azure:** [`docs/logs/demo-session-azure.log`](docs/logs/demo-session-azure.log)
+- **Combined REST + MCP turn against Azure:** [`docs/logs/demo-azure-combined.log`](docs/logs/demo-azure-combined.log)
+- **Unit test run:** [`docs/test-results.txt`](docs/test-results.txt)
 
 ## Testing
 

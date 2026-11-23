@@ -1,4 +1,4 @@
-# Test run 2026-11-23T11:16Z - node v22.23.5
+# Test run 2026-11-23T18:24Z - node v22.23.5
 > test
 > npm --prefix billing-api test && npm --prefix mcp-server test && npm --prefix agent test
 > billing-api@1.0.0 test
@@ -41,35 +41,39 @@ ok 5 - GET /api/v1/bills/detailed (Query Bill Detailed)
     ok 7 - cannot pay another subscriber's bill (403) or without a token (401)
     ok 8 - returns 404 when paying a bill that was not calculated
 ok 6 - POST /api/v1/bills/pay (Pay Bill)
+# Subtest: Gateway guard (cloud: only the gateway may call the API)
+    ok 1 - with a gateway secret configured, a direct call without X-Gateway-Key is rejected (403)
+    ok 2 - a request carrying the gateway key passes through
+ok 7 - Gateway guard (cloud: only the gateway may call the API)
 # Subtest: Cross-cutting
     ok 1 - unknown routes return a JSON 404 error
     ok 2 - Swagger/OpenAPI document is served
-ok 7 - Cross-cutting
+ok 8 - Cross-cutting
 # Subtest: addUsage records 10 minutes per PHONE event and 1 MB per INTERNET event
-ok 8 - addUsage records 10 minutes per PHONE event and 1 MB per INTERNET event
+ok 9 - addUsage records 10 minutes per PHONE event and 1 MB per INTERNET event
 # Subtest: calculate with no usage produces the $50 internet base bill
-ok 9 - calculate with no usage produces the $50 internet base bill
+ok 10 - calculate with no usage produces the $50 internet base bill
 # Subtest: admin accounts are not billable subscribers (404)
-ok 10 - admin accounts are not billable subscribers (404)
+ok 11 - admin accounts are not billable subscribers (404)
 # Subtest: pay rejects duplicates before touching the balance
-ok 11 - pay rejects duplicates before touching the balance
+ok 12 - pay rejects duplicates before touching the balance
 # Subtest: phone: first 1,000 minutes are free (Guide §2.1)
-ok 12 - phone: first 1,000 minutes are free (Guide §2.1)
+ok 13 - phone: first 1,000 minutes are free (Guide §2.1)
 # Subtest: phone: each started extra 1,000-minute block costs $10 (Guide §2.2 examples)
-ok 13 - phone: each started extra 1,000-minute block costs $10 (Guide §2.2 examples)
+ok 14 - phone: each started extra 1,000-minute block costs $10 (Guide §2.2 examples)
 # Subtest: internet: $50 base even with zero usage, up to 20 GB (Guide §3.1)
-ok 14 - internet: $50 base even with zero usage, up to 20 GB (Guide §3.1)
+ok 15 - internet: $50 base even with zero usage, up to 20 GB (Guide §3.1)
 # Subtest: internet: each started extra 10 GB block costs $10 (Guide §3.2 examples)
-ok 15 - internet: each started extra 10 GB block costs $10 (Guide §3.2 examples)
+ok 16 - internet: each started extra 10 GB block costs $10 (Guide §3.2 examples)
 # Subtest: worked example: 1,350 minutes + 35 GB = $80 (Guide §4.3)
-ok 16 - worked example: 1,350 minutes + 35 GB = $80 (Guide §4.3)
+ok 17 - worked example: 1,350 minutes + 35 GB = $80 (Guide §4.3)
 # Subtest: due date is 15 days after the end of the billing month (Guide §6.1)
-ok 17 - due date is 15 days after the end of the billing month (Guide §6.1)
+ok 18 - due date is 15 days after the end of the billing month (Guide §6.1)
 # Subtest: status: partial payment does not mark bill paid (Guide §5.1)
-ok 18 - status: partial payment does not mark bill paid (Guide §5.1)
-# tests 39
-# suites 7
-# pass 39
+ok 19 - status: partial payment does not mark bill paid (Guide §5.1)
+# tests 41
+# suites 8
+# pass 41
 # fail 0
 > mcp-server@1.0.0 test
 > node --test test/*.test.ts
