@@ -30,21 +30,14 @@ export function toBillDto(subscriberNo: string, b: Bill): BillDto {
   };
 }
 
+/**
+ * Charge breakdown = data only (usage and the stored charges). Pricing policy is deliberately NOT
+ * repeated here: per Billing Guide §9 the assistant explains rules from the MCP documentation index.
+ */
 export function toBreakdownDto(b: Bill) {
   return {
-    phone: {
-      minutes: b.phoneMinutes,
-      includedMinutes: 1000,
-      charge: b.phoneCharge,
-      rule: "First 1,000 minutes free; $10 per started additional 1,000-minute block (Guide §2)",
-    },
-    internet: {
-      megabytes: b.internetMb,
-      gigabytes: b.internetMb / 1000,
-      includedGb: 20,
-      charge: b.internetCharge,
-      rule: "$50 up to 20 GB; $10 per started additional 10 GB block (Guide §3)",
-    },
+    phone: { minutes: b.phoneMinutes, charge: b.phoneCharge },
+    internet: { megabytes: b.internetMb, gigabytes: b.internetMb / 1000, charge: b.internetCharge },
     total: b.total,
   };
 }

@@ -276,22 +276,19 @@ components:
         calculatedAt: { type: string, format: date-time }
     Breakdown:
       type: object
+      description: Usage and stored charges only. Pricing rules are documented in the billing guide (MCP search), not repeated here.
       properties:
         phone:
           type: object
           properties:
             minutes: { type: integer }
-            includedMinutes: { type: integer }
             charge: { type: number }
-            rule: { type: string }
         internet:
           type: object
           properties:
             megabytes: { type: integer }
             gigabytes: { type: number }
-            includedGb: { type: integer }
             charge: { type: number }
-            rule: { type: string }
         total: { type: number }
     Error:
       type: object
