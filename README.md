@@ -9,7 +9,7 @@ A conversational assistant for mobile subscribers. It answers questions about bi
 | **Billing REST API** | Node.js 22 + TypeScript, Express 5, JWT, OpenAPI/Swagger, **PostgreSQL 16** | `billing-api/`, `db/` |
 | **API Gateway** | Kong 3.9 (DB-less, declarative), with JWT, rate limiting and versioned routes | `gateway/` |
 
-> Deployment URLs (Azure): _see [Cloud deployment](#cloud-deployment)_.
+> **Live on Azure:** gateway `https://gateway.grayforest-a8b5e275.polandcentral.azurecontainerapps.io` · Swagger [`/api/v1/docs`](https://gateway.grayforest-a8b5e275.polandcentral.azurecontainerapps.io/api/v1/docs) · MCP `https://mcp-server.grayforest-a8b5e275.polandcentral.azurecontainerapps.io/mcp` — details in [Cloud deployment](#cloud-deployment).
 
 ## Architecture
 
@@ -272,7 +272,7 @@ All tests run with `npm test` from the repo root (or `npm test` inside each fold
 
 | Suite | Count | Covers |
 |---|---|---|
-| `billing-api` | 39 | Service-layer tests without HTTP, pricing edge cases (1,000/1,001 min, 20,000/20,001 MB, the §4.3 $80 example), due dates, and every endpoint with success **and** failure cases: validation, 401/403, 404, duplicate transaction (sequential and concurrent), overpayment, partial/full payment, recalculation keeping payments |
+| `billing-api` | 41 | Service-layer tests without HTTP, gateway guard (403 without the gateway key), pricing edge cases (1,000/1,001 min, 20,000/20,001 MB, the §4.3 $80 example), due dates, and every endpoint with success **and** failure cases: validation, 401/403, 404, duplicate transaction (sequential and concurrent), overpayment, partial/full payment, recalculation keeping payments |
 | `mcp-server` | 13 | Chunking, FTS-injection safety, index reuse/rebuild, 3 retrieval queries, real MCP calls over stdio and Streamable HTTP |
 | `agent` | 18 | Full agent loop with a scripted fake LLM: MCP-only, combined REST+MCP, payment approved/rejected, LLM-supplied subscriber number ignored, Gemini message preservation, argument validation, no admin tools, transaction-ID retry, LLM client (provider selection, request format, 429 retry, daily-quota fail-fast) |
 
@@ -280,7 +280,38 @@ Evidence: `docs/test-results.txt`.
 
 ## Cloud deployment
 
-_Target: Azure._ Container Apps run `billing-api` and `mcp-server`. Azure Database for PostgreSQL Flexible Server holds the data. Azure API Management (Consumption) is the gateway, with the same routes, `validate-jwt` and `rate-limit-by-key`. URLs and step-by-step instructions will be added here.
+The system runs on **Azure** (Azure for Students subscription, region Poland Central). Step-by-step commands are in [`docs/azure-deployment.md`](docs/azure-deployment.md).
+
+| Component | Azure service | URL |
+|---|---|---|
+| **API Gateway** (Kong 3.9, same routes as `gateway/kong.yml`) | Azure Container Apps | https://gateway.grayforest-a8b5e275.polandcentral.azurecontainerapps.io |
+| Swagger UI (through the gateway) | – | https://gateway.grayforest-a8b5e275.polandcentral.azurecontainerapps.io/api/v1/docs |
+| **MCP server** (Streamable HTTP, separate from the gateway) | Azure Container Apps | https://mcp-server.grayforest-a8b5e275.polandcentral.azurecontainerapps.io/mcp |
+| **Billing API** | Azure Container Apps | Accepts only gateway traffic (see below) |
+| **PostgreSQL 16** | Azure Database for PostgreSQL Flexible Server (B1ms) | Azure-internal access only, SSL required |
+| Container images | Azure Container Registry | – |
+
+Quick checks:
+
+- Public route through the gateway → 200: `https://gateway.grayforest-a8b5e275.polandcentral.azurecontainerapps.io/api/v1/bills?subscriberNo=5551001&month=10&year=2026`
+- Protected route without a token → **401 from Kong**: `https://gateway.grayforest-a8b5e275.polandcentral.azurecontainerapps.io/api/v1/bills/detailed?month=10&year=2026`
+- Calling the Billing API directly, bypassing the gateway → **403 `GATEWAY_REQUIRED`**: `https://billing-api.grayforest-a8b5e275.polandcentral.azurecontainerapps.io/api/v1/bills?subscriberNo=5551001&month=10&year=2026`
+
+**Gateway-only access in the cloud.** The Container Apps environment created for Azure for Students is an *Express* environment, where app-to-app internal-only ingress could not be used. The Billing API therefore has an HTTPS address, but it accepts a request only if it carries the `X-Gateway-Key` header. Kong adds this shared secret to every request it forwards, after first removing any client-supplied value (`request-transformer` plugin). Direct calls get 403. Locally the API port is simply not published.
+
+**Running the agent against Azure:**
+
+```cmd
+set GATEWAY_URL=https://gateway.grayforest-a8b5e275.polandcentral.azurecontainerapps.io
+set MCP_URL=https://mcp-server.grayforest-a8b5e275.polandcentral.azurecontainerapps.io/mcp
+npm run agent
+```
+
+Deployment decisions:
+
+- Kong runs on Container Apps instead of Azure API Management, so that local and cloud gateways share one route configuration.
+- Images are built locally and pushed, because ACR cloud builds are not permitted on Azure for Students.
+- The cloud JWT secret and the gateway key are generated per deployment and kept out of Git (`gateway/kong.cloud.yml`, `scripts/azure-env.cmd`).
 
 ## LLM cost
 
@@ -311,4 +342,4 @@ Each entry gives the assumption, the reason and the spec reference.
 13. **Months without a year** in a question mean the most recent such month not after today.
 14. **The MCP path is separate from the gateway**, per the required architecture. The MCP server exposes only public policy text.
 15. **Data vs policy:** the Query Bill Detailed breakdown returns usage and stored charges only, not pricing rule texts. Rules are explained from the billing guide via MCP (Guide §9), so the same policy is not maintained in two places.
-16. **Secrets:** `.env` is not committed. The development JWT secret in `kong.yml` and `docker-compose.yml` is for local use only.
+16. **Secrets:** `.env`, `gateway/kong.cloud.yml` and `scripts/azure-env.cmd` are not committed. The development JWT secret in `kong.yml` and `docker-compose.yml` is for local use only.
